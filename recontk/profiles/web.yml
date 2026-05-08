@@ -1,0 +1,22 @@
+# recontk/profiles/web.yml"
+# Web-focused: HTTP probing, fingerprinting, content discovery, TLS
+#
+# AUTHORIZED USE ONLY
+
+name: "web"
+description: "Web application focused scan"
+
+modules:
+  - webinspect
+  - contentdiscovery
+
+module_config:
+  contentdiscovery:
+    wordlist: "wordlists/common.txt"
+
+rate_limit:
+  requests_per_second: 10.0
+  burst: 20
+
+concurrency:
+  max_workers: 10
