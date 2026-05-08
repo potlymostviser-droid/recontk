@@ -1,0 +1,57 @@
+# recontk Scan Report
+
+**Target:** {{ manifest.target }}  
+**Profile:** {{ manifest.profile }}  
+**Status:** {{ manifest.status }}  
+**Created:** {{ manifest.created_at }}  
+**Updated:** {{ manifest.updated_at }}  
+**Workspace:** `{{ manifest.workspace_path }}`
+
+---
+
+## Summary
+
+| Metric                  | Value                          |
+|-------------------------|--------------------------------|
+| Total Findings          | {{ summary.total_findings }}   |
+| Stages Completed        | {{ summary.stages_completed }} |
+| Stages Failed           | {{ summary.stages_failed }}    |
+| Total Duration          | {{ summary.total_duration_s }}s|
+
+### Findings by Type
+
+| Type                    | Count                          |
+|-------------------------|--------------------------------|
+{% for type, count in summary.findings_by_type.items() %}
+| {{ type }}              | {{ count }}                    |
+{% endfor %}
+
+### Findings by Severity
+
+| Severity                | Count                          |
+|-------------------------|--------------------------------|
+{% for sev, count in summary.findings_by_severity.items() %}
+| {{ sev }}               | {{ count }}                    |
+{% endfor %}
+
+---
+
+## Findings
+
+{% for type, findings in findings_by_type.items() %}
+### {{ type }} ({{ findings|length }})
+
+{% for finding in findings %}
+- **{{ finding.value }}**  
+  Tool: `{{ finding.tool }}`  
+  Target: `{{ finding.target }}`  
+  {% if finding.severity %}Severity: **{{ finding.severity }}**{% endif %}  
+  Timestamp: {{ finding.timestamp }}  
+  {% if finding.metadata %}Metadata: `{{ finding.metadata }}`{% endif %}
+
+{% endfor %}
+{% endfor %}
+
+---
+
+*Report generated at {{ generated_at }}*
