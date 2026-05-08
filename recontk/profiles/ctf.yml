@@ -1,0 +1,34 @@
+# recontk/profiles/ctf.yml
+# CTF / lab environment: relaxed rate limits, all modules
+#
+# AUTHORIZED USE ONLY (CTF/lab environments)
+
+name: "ctf"
+description: "CTF/lab optimized (relaxed limits)"
+
+modules:
+  - passiverecon
+  - activerecon
+  - subdomainenum
+  - portdiscovery
+  - webinspect
+  - contentdiscovery
+  - vulnchecks
+
+module_config:
+  portdiscovery:
+    ports: null
+
+  contentdiscovery:
+    wordlist: "wordlists/common.txt"
+
+rate_limit:
+  requests_per_second: 50.0
+  burst: 100
+
+concurrency:
+  max_workers: 50
+
+safety:
+  allow_private: true
+  max_targets_without_confirm: 500
