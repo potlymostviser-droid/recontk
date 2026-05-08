@@ -1,0 +1,49 @@
+# recontk example configuration
+# Copy to config.yml in your working directory and adjust as needed.
+#
+# AUTHORIZED USE ONLY — see README.md
+
+workspace_root: ./workspaces
+wordlist_dir: ./wordlists
+
+rate_limit:
+  requests_per_second: 10.0
+  burst: 20
+
+concurrency:
+  max_workers: 10
+  task_timeout_s: 300.0
+
+proxy:
+  http: null    # e.g. http://127.0.0.1:8080
+  https: null
+
+output:
+  formats:
+    - json
+    - md
+    - html
+  keep_raw: true
+
+safety:
+  allow_private: false
+  max_targets_without_confirm: 50
+  dry_run: false
+
+tool_timeouts:
+  nmap: 600.0
+  masscan: 300.0
+  subfinder: 120.0
+  amass: 300.0
+  httpx: 120.0
+  nuclei: 600.0
+  naabu: 120.0
+  gowitness: 120.0
+  whatweb: 60.0
+  wafw00f: 60.0
+  dnsx: 120.0
+  ffuf: 300.0
+  gobuster: 300.0
+  testssl: 300.0
+  sslyze: 120.0
+  theharvester: 120.0
