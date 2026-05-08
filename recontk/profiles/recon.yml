@@ -1,0 +1,30 @@
+# recontk/profiles/recon.yml
+# Full reconnaissance profile: passive + active + subdomain enum + port scan + web inspect
+#
+# AUTHORIZED USE ONLY
+
+name: "recon"
+description: "Comprehensive reconnaissance (passive + active)"
+
+modules:
+  - passiverecon
+  - activerecon
+  - subdomainenum
+  - portdiscovery
+  - webinspect
+
+# Module-specific overrides
+module_config:
+  portdiscovery:
+    # Leave ports unset → tool default (nmap: top 1000, native: top 100)
+    ports: null
+
+  webinspect:
+    screenshot: true
+
+rate_limit:
+  requests_per_second: 10.0
+  burst: 20
+
+concurrency:
+  max_workers: 10
