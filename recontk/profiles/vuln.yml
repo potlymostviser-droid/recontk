@@ -1,0 +1,20 @@
+# recontk/profiles/vuln.yml
+# Vulnerability scanning only (requires nuclei)
+#
+# AUTHORIZED USE ONLY
+
+name: "vuln"
+description: "Nuclei vulnerability scanning"
+
+modules:
+  - vulnchecks
+
+rate_limit:
+  requests_per_second: 5.0
+  burst: 10
+
+concurrency:
+  max_workers: 10
+
+tool_timeouts:
+  nuclei: 1200.0  # 20 minutes
