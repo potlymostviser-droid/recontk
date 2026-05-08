@@ -1,0 +1,27 @@
+# recontk/profiles/stealth.yml
+# Stealth profile: minimal footprint, low rate, passive-first
+#
+# AUTHORIZED USE ONLY
+
+name: "stealth"
+description: "Minimal footprint reconnaissance"
+
+modules:
+  - passiverecon
+  - subdomainenum
+
+module_config:
+  subdomainenum:
+    # Prefer passive-only tools
+    providers: ["subfinder"]
+
+rate_limit:
+  requests_per_second: 2.0
+  burst: 5
+
+concurrency:
+  max_workers: 3
+
+tool_timeouts:
+  subfinder: 180.0
+  amass: 300.0
