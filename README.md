@@ -45,6 +45,42 @@ source .venv/bin/activate
 bash scripts/bootstrap_tools.sh    # review first; set AUTO_INSTALL=1 to run
 
 # 4. Verify installation
+
+CLI Reference
+text
+
+recontk init
+recontk doctor
+recontk scan --profile <name> --target <host>
+recontk scan --profile <name> --targets <file> --workspace <name>
+recontk resume <workspace-path>
+recontk reimport <workspace-path>
+recontk report <workspace-path> --format [json|md|html|csv]
+recontk profiles [list | show <name>]
+recontk plugins list
+Global flags: --dry-run, --verbose, --proxy <url>,
+--allow-private, --confirm
+
+Configuration
+Copy examples/config.example.yml to config.yml and adjust. See also
+.env.example for environment variable overrides.
+
+Profiles
+Profile	Description
+recon	Full passive + active recon
+bugbounty	Scope-aware, rate-limited
+stealth	Minimal footprint
+normal	Balanced defaults
+web	Web-focused (HTTP, TLS, content)
+vuln	Vulnerability scanning (nuclei)
+ctf	CTF/lab — relaxed rate limits
+Safety Defaults
+RFC1918 / loopback ranges blocked unless --allow-private is set
+Target lists > 50 entries require --confirm
+All outbound traffic respects --proxy and HTTP_PROXY / HTTPS_PROXY
+Conservative default concurrency and rate limits
+Plugin Development
+See examples/plugin-skeleton/ for a complete example.
 recontk doctor
 
 # 5. Run a scan
