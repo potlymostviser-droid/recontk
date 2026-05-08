@@ -1,0 +1,23 @@
+# recontk/profiles/normal.yml
+# Balanced default profile
+#
+# AUTHORIZED USE ONLY
+
+name: "normal"
+description: "Balanced scan profile (default)"
+
+modules:
+  - passiverecon
+  - portdiscovery
+  - webinspect
+
+module_config:
+  portdiscovery:
+    ports: null  # tool default
+
+rate_limit:
+  requests_per_second: 10.0
+  burst: 20
+
+concurrency:
+  max_workers: 10
