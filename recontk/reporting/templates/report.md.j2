@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>recontk Report — {{ manifest.target }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { color: #1a73e8; margin-bottom: 1rem; }
+        h2 { color: #555; margin-top: 2rem; margin-bottom: 1rem; border-bottom: 2px solid #1a73e8; padding-bottom: 0.5rem; }
+        h3 { color: #666; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #ddd; }
+        th { background: #f0f0f0; font-weight: 600; }
+        .meta { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+        .badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem; font-weight: 600; }
+        .badge-critical { background: #d32f2f; color: white; }
+        .badge-high { background: #f57c00; color: white; }
+        .badge-medium { background: #fbc02d; color: black; }
+        .badge-low { background: #388e3c; color: white; }
+        .badge-info { background: #1976d2; color: white; }
+        .finding { background: #fafafa; padding: 1rem; margin: 0.5rem 0; border-left: 4px solid #1a73e8; border-radius: 4px; }
+        .finding-value { font-weight: 600; color: #1a73e8; }
+        .finding-meta { font-size: 0.85rem; color: #666; margin-top: 0.5rem; }
+        footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; color: #999; font-size: 0.85rem; text-align: center; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>recontk Scan Report</h1>
+    <div class="meta">
+        <strong>Target:</strong> {{ manifest.target }}<br>
+        <strong>Profile:</strong> {{ manifest.profile }}<br>
+        <strong>Status:</strong> {{ manifest.status }}<br>
+        <strong>Created:</strong> {{ manifest.created_at }}<br>
+        <strong>Workspace:</strong> <code>{{ manifest.workspace_path }}</code>
+    </div>
+
+    <h2>Summary</h2>
+    <table>
+        <tr><th>Metric</th><th>Value</th></tr>
+        <tr><td>Total Findings</td><td>{{ summary.total_findings }}</td></tr>
+        <tr><td>Stages Completed</td><td>{{ summary.stages_completed }}</td></tr>
+        <tr><td>Stages Failed</td><td>{{ summary.stages_failed }}</td></tr>
+        <tr><td>Total Duration</td><td>{{ summary.total_duration_s }}s</td></tr>
+    </table>
+
+    <h3>Findings by Type</h3>
+    <table>
+        <tr><th>Type</th><th>Count</th></tr>
+        {% for type, count in summary.findings_by_type.items() %}
+        <tr><td>{{ type }}</td><td>{{ count }}</td></tr>
+        {% endfor %}
+    </table>
+
+    {% if summary.findings_by_severity %}
+    <h3>Findings by Severity</h3>
+    <table>
+        <tr><th>Severity</th><th>Count</th></tr>
+        {% for sev, count in summary.findings_by_severity.items() %}
+        <tr><td><span class="badge badge-{{ sev }}">{{ sev }}</span></td><td>{{ count }}</td></tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+
+    <h2>Findings</h2>
+    {% for type, findings in findings_by_type.items() %}
+    <h3>{{ type }} ({{ findings|length }})</h3>
+    {% for finding in findings %}
+    <div class="finding">
+        <div class="finding-value">{{ finding.value }}</div>
+        <div class="finding-meta">
+            Tool: <code>{{ finding.tool }}</code> |
+            Target: <code>{{ finding.target }}</code> |
+            {% if finding.severity %}<span class="badge badge-{{ finding.severity }}">{{ finding.severity }}</span> |{% endif %}
+            {{ finding.timestamp }}
+            {% if finding.metadata %}<br>Metadata: <code>{{ finding.metadata }}</code>{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% endfor %}
+
+    <footer>
+        Report generated at {{ generated_at }}
+    </footer>
+</div>
+</body>
+</html>
