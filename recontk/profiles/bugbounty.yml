@@ -1,0 +1,32 @@
+# recontk/profiles/bugbounty.yml
+# Bug bounty profile: scope-aware, rate-limited, all modules except aggressive vulnchecks
+#
+# AUTHORIZED USE ONLY
+
+name: "bugbounty"
+description: "Bug bounty optimized: scope-aware, rate-limited"
+
+modules:
+  - passiverecon
+  - subdomainenum
+  - portdiscovery
+  - webinspect
+  - contentdiscovery
+
+module_config:
+  portdiscovery:
+    ports: [80, 443, 8080, 8443, 3000, 5000]
+
+  contentdiscovery:
+    wordlist: "wordlists/raft-small-words.txt"
+
+rate_limit:
+  requests_per_second: 5.0
+  burst: 10
+
+concurrency:
+  max_workers: 5
+
+safety:
+  allow_private: false
+  max_targets_without_confirm: 25
