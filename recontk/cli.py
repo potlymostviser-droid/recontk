@@ -341,17 +341,245 @@ def _resolve_profile_path(name: str) -> Path:
     return builtin  # return the path even if it doesn't exist (caller checks)
 
 
-@app.command()
 def resume(
     workspace_path: Path = typer.Argument(..., help="Path to workspace directory"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
+    proxy: str | None = typer.Option(None, "--proxy"),
 ) -> None:
     """Resume an interrupted scan from its workspace."""
     _print_banner()
-    console.print(f"[yellow]resume not yet implemented[/yellow]")
-    console.print(f"Workspace: {workspace_path}")
-    # TODO Phase 6: implement resume logic
-    raise typer.Exit(1)
+
+    if not workspace_path.exists():
+        console.print(f"[red]Error:[/red] Workspace not found: {workspace_path}", style="bold")
+        raise typer.Exit(1)
+
+    try:
+        ws = Workspace.open(workspace_path)
+    except Exception as exc:
+        console.print(f"[red]Error:[/red] Cannot open workspace: {exc}", style="bold")
+        raise typer.Exit(1)
+
+    if ws.manifest.status == "completed":
+        console.print("[yellow]Warning:[/yellow] Workspace already completed", style="bold")
+        console.print("Use 'reimport' to re-process raw outputs or 'report' to generate a new report.")
+        raise typer.Exit(0)
+
+    console.print(f"[bold]Resuming scan:[/bold] {ws.manifest.target}")
+    console.print(f"  Profile: {ws.manifest.profile}")
+    console.print(f"  Completed stages: {', '.join(ws.completed_stages()) or 'none'}")
+
+    # Load config (use defaults + any overrides)
+    config = load_config()
+    if proxy:
+        config.proxy.http = proxy
+        config.proxy.https = proxy
+
+    # Load profile
+    import yaml
+    profile_path = _resolve_profile_path(ws.manifest.profile)
+    if not profile_path.exists():
+        console.print(f"[red]Error:[/red] Profile not found: {ws.manifest.profile}", style="bold")
+        raise typer.Exit(1)
+    profile_data = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+
+    # Resume execution
+    import asyncio
+    try:
+        asyncio.run(_resume_scan(ws, profile_data, config, verbose))
+    except RecontkError as exc:
+        console.print(f"[red]Resume failed:[/red] {exc.message}", style="bold")
+        raise typer.Exit(1)
+
+
+async def _resume_scan(
+    ws: Workspace,
+    profile_data: dict[str, Any],
+    config: Any,
+    verbose: bool,
+) -> None:
+    """Resume scan execution from the last incomplete stage."""
+    from importlib import import_module
+
+    ws.set_status("running")
+
+    logger = StructuredLogger.create(
+        name="recontk.resume",
+        jsonl_path=ws.run_jsonl(),
+        verbose=verbose,
+    )
+
+    logger.event("scan_resumed", workspace=str(ws.path))
+
+    # Registry + runner
+    registry = get_registry()
+    registry.detect(logger=logger)
+    ws.update_tool_versions(registry.versions())
+
+    runner = Runner(registry, ws, config, logger)
+
+    # Execute only incomplete modules
+    modules = profile_data.get("modules", [])
+    completed = set(ws.completed_stages())
+
+    for module_name in modules:
+        if module_name in completed:
+            logger.info(f"Skipping completed module: {module_name}")
+            continue
+
+        logger.info(f"Executing module: {module_name}", module=module_name)
+        ws.record_stage_start(module_name)
+        try:
+            mod = import_module(f"recontk.modules.{module_name}")
+            module_config = profile_data.get("module_config", {}).get(module_name, {})
+            await mod.run(ws.manifest.target, runner, logger, **module_config)
+            ws.record_stage_end(module_name, success=True)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"Module failed: {module_name}", error=str(exc))
+            ws.record_stage_end(module_name, success=False, error=str(exc))
+
+    ws.set_status("completed")
+    logger.event("scan_finished", workspace=str(ws.path))
+    console.print(f"\n[bold green]✓ Scan resumed and completed:[/bold green] {ws.path}")
+
+
+# Update the report command:
+
+@app.command()
+def report(
+    workspace_path: Path = typer.Argument(..., help="Path to workspace directory"),
+    format: str = typer.Option("json", "--format", "-f", help="Report format: json|md|html|csv"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output file path"),
+) -> None:
+    """Generate a report from a workspace."""
+    _print_banner()
+
+    if not workspace_path.exists():
+        console.print(f"[red]Error:[/red] Workspace not found: {workspace_path}", style="bold")
+        raise typer.Exit(1)
+
+    try:
+        ws = Workspace.open(workspace_path)
+    except Exception as exc:
+        console.print(f"[red]Error:[/red] Cannot open workspace: {exc}", style="bold")
+        raise typer.Exit(1)
+
+    from recontk.reporting.exporter import generate_report
+
+    try:
+        report_path = generate_report(ws, format, output)
+        console.print(f"[bold green]✓ Report generated:[/bold green] {report_path}")
+    except Exception as exc:
+        console.print(f"[red]Error:[/red] Report generation failed: {exc}", style="bold")
+        raise typer.Exit(1)
+
+
+# Update the reimport command:
+
+@app.command()
+def reimport(
+    workspace_path: Path = typer.Argument(..., help="Path to workspace directory"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """
+    Re-import raw tool output into normalized findings.
+
+    Useful when:
+      - A tool wrapper's parse_output() has been updated.
+      - Raw output files were manually added to workspace/raw/.
+      - You want to re-process findings without re-running the tools.
+    """
+    _print_banner()
+
+    if not workspace_path.exists():
+        console.print(f"[red]Error:[/red] Workspace not found: {workspace_path}", style="bold")
+        raise typer.Exit(1)
+
+    try:
+        ws = Workspace.open(workspace_path)
+    except Exception as exc:
+        console.print(f"[red]Error:[/red] Cannot open workspace: {exc}", style="bold")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Re-importing findings:[/bold] {ws.path}")
+
+    logger = StructuredLogger.create(
+        name="recontk.reimport",
+        jsonl_path=ws.run_jsonl(),
+        verbose=verbose,
+    )
+
+    # Registry (needed to instantiate wrappers for parsing)
+    registry = get_registry()
+    registry.detect(logger=logger)
+
+    # Iterate raw/ subdirectories and re-parse
+    raw_dir = ws.raw_dir()
+    if not raw_dir.exists():
+        console.print("[yellow]No raw outputs found in workspace[/yellow]")
+        raise typer.Exit(0)
+
+    import asyncio
+    asyncio.run(_reimport_raw(ws, registry, logger))
+    console.print("[bold green]✓ Re-import complete[/bold green]")
+
+
+async def _reimport_raw(ws: Workspace, registry: ToolRegistry, logger: StructuredLogger) -> None:
+    """Re-parse all raw tool outputs and write to normalized/."""
+    from importlib import import_module
+
+    raw_dir = ws.raw_dir()
+    for tool_dir in raw_dir.iterdir():
+        if not tool_dir.is_dir():
+            continue
+        tool_key = tool_dir.name.replace("native_", "native/")
+        logger.info(f"Re-importing: {tool_key}")
+
+        # Determine if tool or native
+        if tool_key.startswith("native/"):
+            # Native backends don't have separate parse_output — skip
+            logger.debug(f"Skipping native backend: {tool_key}")
+            continue
+
+        # Load wrapper class
+        try:
+            from recontk.core.runner import Runner
+            # We need a dummy runner to load the wrapper class
+            # Use a helper that just loads the class without running
+            wrapper_class = Runner(registry, ws, load_config(), logger)._load_wrapper_class(tool_key)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Cannot load wrapper for {tool_key}: {exc}")
+            continue
+
+        # Instantiate wrapper (we only need parse_output, so binary path is dummy)
+        wrapper = wrapper_class(
+            binary="/bin/true",  # dummy
+            workspace=ws,
+            logger=logger,
+        )
+
+        # Parse each raw file
+        for raw_file in tool_dir.glob("*"):
+            if raw_file.is_dir():
+                continue
+            logger.debug(f"Parsing: {raw_file}")
+            try:
+                # Extract target from filename (convention: <safe-target>.<ext>)
+                target = raw_file.stem.replace("_", ".")
+                findings = wrapper.parse_output(raw_file, target)
+                # Write to normalized
+                from recontk.models import NormalizedResult
+                result = NormalizedResult(
+                    tool=tool_key,
+                    target=target,
+                    duration_s=0.0,
+                    findings=findings,
+                    errors=[],
+                    raw_path=str(raw_file),
+                )
+                normalized_path = ws.normalized_path(f"{tool_key}_{raw_file.stem}")
+                result.save(normalized_path)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f"Parse error for {raw_file}: {exc}")
 
 
 @app.command()
@@ -367,18 +595,6 @@ def reimport(
     raise typer.Exit(1)
 
 
-@app.command()
-def report(
-    workspace_path: Path = typer.Argument(..., help="Path to workspace directory"),
-    format: str = typer.Option("json", "--format", "-f", help="Report format: json|md|html|csv"),
-    output: Path | None = typer.Option(None, "--output", "-o", help="Output file path"),
-) -> None:
-    """Generate a report from a workspace."""
-    _print_banner()
-    console.print(f"[yellow]report not yet implemented[/yellow]")
-    console.print(f"Workspace: {workspace_path}, format: {format}")
-    # TODO Phase 6: implement reporting
-    raise typer.Exit(1)
 
 
 @app.command()
